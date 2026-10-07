@@ -1,0 +1,26 @@
+name: Update Top Rated lists
+
+on:
+  schedule:
+    - cron: '23 18 * * 0'   # weekly, Monday ~5am Melbourne time
+  workflow_dispatch:         # adds a "Run workflow" button
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node build.js
+      - name: Save updated lists
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add docs
+          git diff --cached --quiet || git commit -m "Update Top Rated lists"
+          git push

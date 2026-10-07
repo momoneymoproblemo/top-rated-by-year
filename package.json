@@ -1,0 +1,7 @@
+{
+  "name": "top-rated-by-year",
+  "version": "1.0.0",
+  "description": "Stremio add-on: the highest-rated films of every year since 1950, ranked by IMDb rating",
+  "scripts": { "build": "node build.js" },
+  "engines": { "node": ">=18" }
+}

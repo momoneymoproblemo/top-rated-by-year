@@ -100,6 +100,8 @@
   .rules b { display: block; margin: 6px 0 6px; font-weight: 600; }
   .rules p { margin: 0; color: var(--muted); font-size: 14.5px; }
 
+  .note-box { margin-top: 16px; padding: 18px 20px; border-radius: 14px; background: var(--verm-soft); border: 1px solid rgba(255,90,54,.35); color: #e6ddd1; font-size: 15px; }
+  .note-box b { color: var(--ivory); }
   footer { margin-top: 96px; border-top: 1px solid var(--line); }
   footer .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding-top: 40px; padding-bottom: 56px; }
   footer h3 { margin: 0 0 10px; font-size: 32px; }
@@ -170,10 +172,13 @@
     <h2 class="display">How it's ranked</h2>
     <p>Highest rated first, with a few rules so a list never gets padded or gamed.</p>
     <div class="rules">
-      <div><span class="k">01</span><b>Real vote counts</b><p>Every film needs at least 1,000 IMDb votes, and more in busy modern years, so a handful of fans can't crown a winner.</p></div>
+      <div><span class="k">01</span><b>Real vote counts</b><p>Every film needs at least 1,000 IMDb votes, more in busier years, and 20,000 from 2000 onwards, so a handful of fans can't crown a winner.</p></div>
       <div><span class="k">02</span><b>Weighted like the Top 250</b><p>Films with fewer votes are nudged towards their year's average until there's enough evidence they belong at the top.</p></div>
       <div><span class="k">03</span><b>No filler</b><p>Nothing rated under 6.0 makes it. Lists run up to 250 films. Older years are shorter because fewer films clear the bar.</p></div>
-      <div><span class="k">04</span><b>Feature films only</b><p>No documentaries, shorts or TV. Refreshed weekly as new votes roll in.</p></div>
+      <div><span class="k">04</span><b>Films, not gigs</b><p>Feature films and documentaries only. No shorts, TV or concert films, which get rated like a gig rather than a film. Refreshed weekly.</p></div>
+    </div>
+    <div class="note-box">
+      <b>A note on Indian cinema.</b> Indian-language films released from 2015 onwards are left out. That's not a judgement on the films: many are excellent. Since around 2015, coordinated fan voting has pushed new releases to the top of IMDb within days, so their scores aren't comparable with everything else. Earlier years are untouched, so classics like <i>Pather Panchali</i> and <i>Monsoon Wedding</i> rank on their merits.
     </div>
   </section>
 </div>
@@ -188,7 +193,7 @@
     <div>
       <h3 class="display">Credits</h3>
       <p>Ratings and vote counts come from IMDb's public datasets, used under IMDb's non-commercial terms. Not affiliated with or endorsed by IMDb or Stremio.</p>
-      <p class="fine">Information courtesy of IMDb (<a href="https://www.imdb.com" target="_blank" rel="noopener">https://www.imdb.com</a>). Used with permission. Posters via Stremio's metadata service. Made by <a href="https://github.com/momoneymoproblemo/top-rated-by-year" target="_blank" rel="noopener">momoneymoproblemo</a><span id="updated"></span>.</p>
+      <p class="fine">Information courtesy of IMDb (<a href="https://www.imdb.com" target="_blank" rel="noopener">https://www.imdb.com</a>). Used with permission. Country and language data from <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>. Posters via Stremio's metadata service. Made by <a href="https://github.com/momoneymoproblemo/top-rated-by-year" target="_blank" rel="noopener">momoneymoproblemo</a><span id="updated"></span>.</p>
     </div>
   </div>
 </footer>

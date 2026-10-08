@@ -21,6 +21,6 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          git add docs
+          git add docs data
           git diff --cached --quiet || git commit -m "Update Top Rated lists"
           git push

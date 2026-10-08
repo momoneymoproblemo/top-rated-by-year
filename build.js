@@ -12,9 +12,15 @@ const FIRST_YEAR = 1950;
 const PER_YEAR = 250;          // max films per year
 const MIN_RATING = 6.0;        // raw IMDb rating floor ("best of" shouldn't include 5s)
 const MIN_RUNTIME = 60;        // minutes; drops featurettes mislabelled as movies
-const EXCLUDE_GENRES = ['Documentary'];
+// Documentaries are in, but concert films (Documentary + Music) are out: they're fan-rated like a gig.
+const isConcertFilm = (genres) => genres.includes('Documentary') && genres.includes('Music');
+// Indian-language films from this year onwards are excluded: coordinated fan voting on release skews
+// their IMDb ratings. Earlier years are untouched. India + language come from Wikidata (CC0).
+const EXCLUDE_INDIAN_FROM = 2015;
 // Per-year vote minimum: the vote count of that year's 500th most-voted film, kept between these.
 const VOTE_FLOOR = 1000, VOTE_CEIL = 10000, VOTE_RANK = 500;
+// From this year on, every film also needs at least this many votes (older years keep the scaled minimum above).
+const MODERN_FROM = 2000, MODERN_MIN_VOTES = 20000;
 // Per-year weighting strength ("m" in IMDb's formula): half the votes of the year's 50th most-voted film.
 const M_FLOOR = 2000, M_CEIL = 50000, M_RANK = 50;
 // ------------------------------------------------------------------------------------------
@@ -23,6 +29,50 @@ const OUT = path.join(__dirname, 'docs');
 const BASE = 'https://momoneymoproblemo.github.io/top-rated-by-year';
 const PAGE = 100; // Stremio pages catalogs with ?skip=100, 200...
 const DATA = 'https://datasets.imdbws.com/';
+const INDIA_CACHE = path.join(__dirname, 'data', 'india.json');
+
+// Films Wikidata lists with India as a country of origin, keyed by IMDb id -> original languages.
+function wikidataIndia() {
+  const q = `SELECT ?imdb (GROUP_CONCAT(DISTINCT ?langLabel; separator="|") AS ?langs) WHERE {
+    ?f wdt:P495 wd:Q668; wdt:P345 ?imdb.
+    FILTER(STRSTARTS(?imdb, "tt"))
+    OPTIONAL { ?f wdt:P364 ?lang. ?lang rdfs:label ?langLabel. FILTER(LANG(?langLabel) = "en") }
+  } GROUP BY ?imdb`;
+  const url = 'https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q);
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: { Accept: 'application/sparql-results+json', 'User-Agent': 'top-rated-by-year-stremio/1.0 (https://github.com/momoneymoproblemo/top-rated-by-year)' }, timeout: 180000 }, (res) => {
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error('Wikidata HTTP ' + res.statusCode)); }
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => (body += c));
+      res.on('end', () => {
+        try {
+          const rows = JSON.parse(body).results.bindings;
+          resolve(Object.fromEntries(rows.map((b) => [b.imdb.value, b.langs ? b.langs.value : ''])));
+        } catch (e) { reject(e); }
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('Wikidata timeout')));
+    req.on('error', reject);
+  });
+}
+
+async function loadIndia() {
+  try {
+    const india = await wikidataIndia();
+    if (Object.keys(india).length < 10000) throw new Error('suspiciously few results');
+    fs.mkdirSync(path.dirname(INDIA_CACHE), { recursive: true });
+    fs.writeFileSync(INDIA_CACHE, JSON.stringify(india));
+    return india;
+  } catch (e) {
+    console.warn(`  Wikidata unavailable (${e.message}); using cached list.`);
+    if (fs.existsSync(INDIA_CACHE)) return JSON.parse(fs.readFileSync(INDIA_CACHE, 'utf8'));
+    throw new Error('No Wikidata result and no cached list — cannot apply the India rule.');
+  }
+}
+
+// Indian film whose languages are anything other than just English (unknown counts as Indian-language).
+const isIndianLanguage = (india, id) => id in india && (india[id] === '' || india[id].split('|').some((l) => l !== 'English'));
 
 function lines(file) {
   if (process.env.IMDB_DIR) { // local copies, for testing
@@ -49,6 +99,10 @@ function write(rel, data) {
 (async () => {
   const thisYear = new Date().getUTCFullYear();
 
+  console.log('Fetching Indian film list from Wikidata…');
+  const india = await loadIndia();
+  console.log(`  ${Object.keys(india).length} films`);
+
   console.log('Reading ratings…');
   const ratings = new Map();
   let first = true;
@@ -72,7 +126,7 @@ function write(rel, data) {
     if (!r) continue;
     const runtime = +f[7] || 0;
     const genres = f[8] === '\\N' ? [] : f[8].split(',');
-    if (runtime < MIN_RUNTIME || genres.some((g) => EXCLUDE_GENRES.includes(g))) continue;
+    if (runtime < MIN_RUNTIME || isConcertFilm(genres)) continue;
     (byYear[year] ||= []).push({ id: f[0], name: f[2], year, runtime, genres, rating: r[0], votes: r[1] });
   }
 
@@ -85,15 +139,21 @@ function write(rel, data) {
     const films = byYear[y] || [];
     if (!films.length) continue;
     const votesDesc = films.map((f) => f.votes).sort((a, b) => b - a);
-    const minVotes = clamp(votesDesc[VOTE_RANK - 1], VOTE_FLOOR, VOTE_CEIL);
+    const scaledMin = clamp(votesDesc[VOTE_RANK - 1], VOTE_FLOOR, VOTE_CEIL);
     const m = clamp(votesDesc[M_RANK - 1] / 2, M_FLOOR, M_CEIL);
-    const pool = films.filter((f) => f.votes >= minVotes);
+    // The year's average (C) is worked out on the scaled pool so it means the same thing in every era.
+    const basePool = films.filter((f) => f.votes >= scaledMin);
+    if (!basePool.length) continue;
+    const C = basePool.reduce((s, f) => s + f.rating, 0) / basePool.length;
+    const pool = y >= MODERN_FROM ? basePool.filter((f) => f.votes >= MODERN_MIN_VOTES) : basePool;
     if (!pool.length) continue;
-    const C = pool.reduce((s, f) => s + f.rating, 0) / pool.length;
     const score = (f) => (f.votes / (f.votes + m)) * f.rating + (m / (f.votes + m)) * C;
 
+    // The year's average and weighting are worked out on the full pool above; exclusions happen after.
+    const excludeIndian = y >= EXCLUDE_INDIAN_FROM;
     const top = pool
       .filter((f) => f.rating >= MIN_RATING)
+      .filter((f) => !(excludeIndian && isIndianLanguage(india, f.id)))
       .map((f) => ({ ...f, score: score(f) }))
       .sort((a, b) => b.score - a.score || b.votes - a.votes)
       .slice(0, PER_YEAR);
@@ -129,9 +189,9 @@ function write(rel, data) {
 
   const manifest = {
     id: 'community.topratedbyyear',
-    version: '1.0.0',
+    version: '1.2.0',
     name: 'Top Rated Films by Year',
-    description: `The highest-rated films of every year from ${FIRST_YEAR} to today, best first. Ranked by IMDb ratings with a vote minimum, refreshed weekly. Unofficial.`,
+    description: `The highest-rated films of every year from ${FIRST_YEAR} to today, best first. Ranked by IMDb ratings with a vote minimum, refreshed weekly. Indian-language films from ${EXCLUDE_INDIAN_FROM} onwards are excluded because coordinated voting skews their ratings. Unofficial.`,
     logo: `${BASE}/logo.png`,
     background: `${BASE}/background.png`,
     resources: ['catalog'],

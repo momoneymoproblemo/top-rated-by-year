@@ -189,14 +189,13 @@ function write(rel, data) {
 
   const manifest = {
     id: 'community.topratedbyyear',
-    version: '1.2.0',
+    version: '1.2.1',
     name: 'Top Rated Films by Year',
     description: `The highest-rated films of every year from ${FIRST_YEAR} to today, best first. Ranked by IMDb ratings with a vote minimum, refreshed weekly. Indian-language films from ${EXCLUDE_INDIAN_FROM} onwards are excluded because coordinated voting skews their ratings. Unofficial.`,
     logo: `${BASE}/logo.png`,
     background: `${BASE}/background.png`,
     resources: ['catalog'],
     types: ['movie'],
-    idPrefixes: ['tt'],
     catalogs: [
       {
         type: 'movie',
